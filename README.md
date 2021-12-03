@@ -15,3 +15,6 @@ least).
 
 I'll probably refactor my code after getting the right answer just enough to be *not too messy*. But that would be about
 it.
+
+## Contributing
+No.
