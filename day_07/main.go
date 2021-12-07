@@ -77,9 +77,5 @@ func abs(x int) int {
 }
 
 func calculateFuel(distance int) int {
-	var consumption int
-	for i := 0; i <= distance; i++ {
-		consumption += i
-	}
-	return consumption
+	return (distance * (distance + 1)) / 2
 }
