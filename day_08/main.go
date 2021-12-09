@@ -89,8 +89,6 @@ func init() {
 	}
 }
 
-// Not particularly proud of this solution but it works. Very sure there's a more efficient way to solve this using
-// some mathematics
 func main() {
 	fmt.Println("Part 1 Answer: ", PartOne(inputs))
 	fmt.Println("Part 2 Answer: ", PartTwo(inputs))
