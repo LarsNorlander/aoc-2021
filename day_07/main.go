@@ -11,7 +11,6 @@ import (
 //go:embed inputs.txt
 var rawInputs string
 var inputs []int
-var min, max int
 
 // Prepare the rawInputs into a format more desirable for the problem at hand.
 func init() {
@@ -22,12 +21,6 @@ func init() {
 			panic(err)
 		}
 		inputs = append(inputs, num)
-		if num > max {
-			max = num
-		}
-		if num < min {
-			min = num
-		}
 	}
 }
 
@@ -40,6 +33,7 @@ func main() {
 
 func PartOne(values []int) int {
 	minConsumption := math.MaxInt
+	min, max := minMax(values)
 
 	for i := min; i <= max; i++ {
 		var fuelConsumption int
@@ -56,6 +50,8 @@ func PartOne(values []int) int {
 
 func PartTwo(values []int) int {
 	minConsumption := math.MaxInt
+	min, max := minMax(values)
+
 	for pointToMoveTo := min; pointToMoveTo <= max; pointToMoveTo++ {
 		var fuelConsumption int
 		for _, val := range values {
@@ -67,6 +63,20 @@ func PartTwo(values []int) int {
 		}
 	}
 	return minConsumption
+}
+
+func minMax(values []int) (int, int) {
+	min := math.MaxInt
+	max := math.MinInt
+	for _, num := range values {
+		if num > max {
+			max = num
+		}
+		if num < min {
+			min = num
+		}
+	}
+	return min, max
 }
 
 func abs(x int) int {
