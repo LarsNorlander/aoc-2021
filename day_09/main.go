@@ -1,23 +1,103 @@
 package main
 
 import (
+	"container/list"
 	_ "embed"
 	"fmt"
-	"reflect"
+	"math"
+	"sort"
 	"strconv"
 	"strings"
 )
 
 //go:embed inputs.txt
 var rawInputs string
-var inputs []Input
+var inputs [][]Cell
 
-type Input struct {
-	Patterns []string
-	Readings []string
+type Cell struct {
+	Location Location
+	Value    int
 }
 
-type Set map[rune]bool
+type Location struct {
+	Row, Col int
+}
+
+// Prepare the rawInputs into a format more desirable for the problem at hand.
+func init() {
+	for rowIdx, rowStr := range strings.Fields(rawInputs) {
+		var row []Cell
+		for colIdx, cell := range rowStr {
+			value, err := strconv.Atoi(string(cell))
+			if err != nil {
+				panic(err)
+			}
+			row = append(row, Cell{
+				Location: Location{
+					Row: rowIdx,
+					Col: colIdx,
+				},
+				Value: value})
+		}
+		inputs = append(inputs, row)
+	}
+}
+
+// The final solution could definitely be de-cluttered, but we'll save that for another time.
+func main() {
+	fmt.Println("Part 1 Answer: ", PartOne(inputs))
+	fmt.Println("Part 2 Answer: ", PartTwo(inputs))
+}
+
+func PartOne(inputs [][]Cell) int {
+	var riskScore int
+
+	for i := 0; i < len(inputs); i++ {
+		for j := 0; j < len(inputs[i]); j++ {
+			lowestAdjacentValue := math.MaxInt
+			for _, cell := range getAdjacentCells(inputs, inputs[i][j].Location) {
+				if cell.Value < lowestAdjacentValue {
+					lowestAdjacentValue = cell.Value
+				}
+			}
+			if inputs[i][j].Value < lowestAdjacentValue {
+				riskScore += 1 + inputs[i][j].Value
+			}
+		}
+	}
+
+	return riskScore
+}
+
+// This function is written with the assumption that it'll never be passed a jagged
+// two-dimensional array, and that there's at least one row and one column
+func getAdjacentCells(grid [][]Cell, loc Location) []Cell {
+	maxRowIdx := len(grid) - 1
+	maxColIdx := len(grid[0]) - 1
+
+	var adjacentValues []Cell
+
+	// get north
+	if loc.Row != 0 {
+		adjacentValues = append(adjacentValues, grid[loc.Row-1][loc.Col])
+	}
+	// get south
+	if loc.Row != maxRowIdx {
+		adjacentValues = append(adjacentValues, grid[loc.Row+1][loc.Col])
+	}
+	// get west
+	if loc.Col != 0 {
+		adjacentValues = append(adjacentValues, grid[loc.Row][loc.Col-1])
+	}
+	// get east
+	if loc.Col != maxColIdx {
+		adjacentValues = append(adjacentValues, grid[loc.Row][loc.Col+1])
+	}
+
+	return adjacentValues
+}
+
+type Set map[Cell]bool
 
 func (set Set) String() string {
 	var s string
@@ -30,7 +110,7 @@ func (set Set) String() string {
 	return s
 }
 
-func SetOf(s ...rune) Set {
+func SetOf(s ...Cell) Set {
 	set := make(Set)
 	for _, val := range s {
 		set[val] = true
@@ -48,140 +128,58 @@ func Union(sets ...Set) Set {
 	return union
 }
 
-func Difference(setA, setB Set) Set {
-	diff := make(Set)
-	for elem, _ := range setA {
-		diff[elem] = true
-	}
-	for elem, _ := range setB {
-		delete(diff, elem)
-	}
-	return diff
+func Append(set Set, elem ...Cell) Set {
+	return Union(set, SetOf(elem...))
 }
 
-func Intersect(setA, setB Set) Set {
-	intersect := make(Set)
-	for elem, _ := range setA {
-		if setB[elem] {
-			intersect[elem] = true
-		}
-	}
-	return intersect
-}
-
-func (set Set) Contains(elem rune) bool {
+func (set Set) Contains(elem Cell) bool {
 	return set[elem]
 }
 
-// Prepare the rawInputs into a format more desirable for the problem at hand.
-func init() {
-	lines := strings.Split(strings.TrimSpace(rawInputs), "\n")
-	for _, line := range lines {
-		input := Input{}
-		temp := strings.Split(line, " | ")
-		for _, enc := range strings.Split(temp[0], " ") {
-			input.Patterns = append(input.Patterns, enc)
-		}
-		for _, reading := range strings.Split(temp[1], " ") {
-			input.Readings = append(input.Readings, reading)
-		}
-		inputs = append(inputs, input)
-	}
-}
-
-func main() {
-	fmt.Println("Part 1 Answer: ", PartOne(inputs))
-	fmt.Println("Part 2 Answer: ", PartTwo(inputs))
-}
-
-func PartOne(values []Input) int {
-	count := 0
-	for _, value := range values {
-		for _, reading := range value.Readings {
-			switch len(reading) {
-			case 7, 4, 3, 2:
-				count++
-				break
+func PartTwo(inputs [][]Cell) int {
+	var lowestPoints []Cell
+	// Look for lowest points
+	for i := 0; i < len(inputs); i++ {
+		for j := 0; j < len(inputs[i]); j++ {
+			lowestAdjacentValue := math.MaxInt
+			for _, cell := range getAdjacentCells(inputs, inputs[i][j].Location) {
+				if cell.Value < lowestAdjacentValue {
+					lowestAdjacentValue = cell.Value
+				}
+			}
+			if inputs[i][j].Value < lowestAdjacentValue {
+				lowestPoints = append(lowestPoints, inputs[i][j])
 			}
 		}
 	}
-	return count
+
+	// For each low point, figure out how big the basin is
+	var basins []Set
+	for _, point := range lowestPoints {
+		basins = append(basins, floodFill(inputs, point))
+	}
+
+	sort.SliceStable(basins, func(i, j int) bool {
+		return len(basins[i]) > len(basins[j])
+	})
+
+	return len(basins[0]) * len(basins[1]) * len(basins[2])
 }
 
-func PartTwo(values []Input) int {
-	var sumOfReadings int
-	for _, value := range values {
-		encodings := make(map[int]Set)
-		var sixSegmentEncodings []Set
-		for _, pattern := range value.Patterns {
-			switch len(pattern) {
-			case 7:
-				encodings[8] = SetOf([]rune(pattern)...)
-				break
-			case 6:
-				sixSegmentEncodings = append(sixSegmentEncodings, SetOf([]rune(pattern)...))
-				break
-			case 4:
-				encodings[4] = SetOf([]rune(pattern)...)
-				break
-			case 3:
-				encodings[7] = SetOf([]rune(pattern)...)
-				break
-			case 2:
-				encodings[1] = SetOf([]rune(pattern)...)
-				break
+func floodFill(inputs [][]Cell, cell Cell) Set {
+	basin := SetOf()
+	q := list.New()
+	q.PushBack(cell)
+	for q.Len() != 0 {
+		n := q.Front().Value.(Cell)
+		q.Remove(q.Front())
+		if n.Value != 9 && !basin.Contains(n) {
+			basin = Append(basin, n)
+			adjacentCells := getAdjacentCells(inputs, n.Location)
+			for _, adjCell := range adjacentCells {
+				q.PushBack(adjCell)
 			}
 		}
-		// Solve for all segments
-		A := Difference(encodings[7], encodings[1])
-		EG := Difference(encodings[8], Union(encodings[7], encodings[4]))
-		BD := Difference(encodings[8], Union(encodings[7], EG))
-		CDE := Union(
-			Difference(encodings[8], sixSegmentEncodings[0]),
-			Difference(encodings[8], sixSegmentEncodings[1]),
-			Difference(encodings[8], sixSegmentEncodings[2]),
-		)
-		G := Difference(EG, CDE)
-		E := Difference(EG, G)
-		CD := Difference(CDE, E)
-		C := Intersect(CD, encodings[1])
-		D := Difference(CD, C)
-		F := Difference(encodings[1], C)
-		B := Difference(BD, D)
-		// Assign remaining encodings
-		encodings[0] = Union(A, B, C, E, F, G)
-		encodings[2] = Union(A, C, D, E, G)
-		encodings[3] = Union(A, C, D, F, G)
-		encodings[5] = Union(A, B, D, F, G)
-		encodings[6] = Union(A, B, D, E, F, G)
-		encodings[9] = Union(A, B, C, D, F, G)
-		// Loop through Readings
-		var readings []int
-		for _, reading := range value.Readings {
-			readings = append(readings, lookup(SetOf([]rune(reading)...), encodings))
-		}
-		sumOfReadings += intSliceToDecimal(readings)
 	}
-	return sumOfReadings
-}
-
-func lookup(reading Set, encodings map[int]Set) int {
-	for value, encoding := range encodings {
-		if reflect.DeepEqual(reading, encoding) {
-			return value
-		}
-	}
-	panic("ya goofed")
-}
-
-func intSliceToDecimal(values []int) int {
-	var str string
-	for _, value := range values {
-		str += strconv.Itoa(value)
-	}
-	val, err := strconv.Atoi(str)
-	if err != nil {
-		panic(err)
-	}
-	return val
+	return basin
 }
