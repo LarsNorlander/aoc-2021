@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -174,5 +175,13 @@ func lookup(reading Set, encodings map[int]Set) int {
 }
 
 func intSliceToDecimal(values []int) int {
-	return (values[0] * 1000) + (values[1] * 100) + (values[2] * 10) + values[3]
+	var str string
+	for _, value := range values {
+		str += strconv.Itoa(value)
+	}
+	val, err := strconv.Atoi(str)
+	if err != nil {
+		panic(err)
+	}
+	return val
 }
